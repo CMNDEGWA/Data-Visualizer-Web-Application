@@ -17,7 +17,7 @@ There is a dynamic ingestion and schemas, are not tied to any particular data st
 - Export processed summaries and reports.
 - Optionally process large workbooks asynchronously.
 
-## Architecture
+### Architecture
 
         Browser
         │
@@ -36,7 +36,7 @@ There is a dynamic ingestion and schemas, are not tied to any particular data st
         └── Django templates + Tailwind CSS
                 └── Chart.js or Plotly
 
-## Technology Stack
+### Technology Stack
 
         Web Application             -           Django
         Database                    -           PostgreSQL
@@ -46,7 +46,7 @@ There is a dynamic ingestion and schemas, are not tied to any particular data st
         UI Styling                  -           Tailwind CSS
         Visualization               -           Vue.js, Chart.js or Plotly
 
-### Data Processing Workflow
+## Data Processing Workflow
 
 1. **Upload**:
     A user uploads an Excel workbook. 
