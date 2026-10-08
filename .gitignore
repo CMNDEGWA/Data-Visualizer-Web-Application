@@ -1,0 +1,83 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments and package managers
+venv/
+env/
+ENV/
+.venv/
+node_modules/
+
+# Django application data and generated files
+db.sqlite3
+db.sqlite3-journal
+db.sqlite3-shm
+db.sqlite3-wal
+media/
+uploads/
+staticfiles/
+static/
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.log
+logs/
+*.pyo
+*.pyd
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.private
+*.secret
+config/settings.local.py
+config/settings.*.local.py
+
+# IDE, editor, and OS files
+.vscode/
+.idea/
+.vs/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Test, documentation, and build artifacts
+dist/
+build/
+*.egg-info/
+*.egg
+*.mo
+*.pot
+*.po
+
+# Compressed archives and local downloads
+*.zip
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+*.bak
+*.orig
+config/settings.py
