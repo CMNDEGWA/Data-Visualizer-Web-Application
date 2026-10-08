@@ -19,22 +19,22 @@ There is a dynamic ingestion and schemas, are not tied to any particular data st
 
 ## Architecture
 
-Browser
-  │
-  ├── Django views, forms, authentication
-  │
-  ├── Upload and workbook inspection
-  │       └── pandas + openpyxl
-  │
-  ├── Validation, mapping, and analysis
-  │       ├── PostgreSQL: jobs, mappings, metrics, audit logs
-  │       └── JSONB or staging storage: flexible source rows
-  │
-  ├── Optional background processing
-  │       └── Celery + Redis
-  │
-  └── Django templates + Tailwind CSS
-          └── Chart.js or Plotly
+        Browser
+        │
+        ├── Django views, forms, authentication
+        │
+        ├── Upload and workbook inspection
+        │       └── pandas + openpyxl
+        │
+        ├── Validation, mapping, and analysis
+        │       ├── PostgreSQL: jobs, mappings, metrics, audit logs
+        │       └── JSONB or staging storage: flexible source rows
+        │
+        ├── Optional background processing
+        │       └── Celery + Redis
+        │
+        └── Django templates + Tailwind CSS
+                └── Chart.js or Plotly
 
 ## Technology Stack
 
