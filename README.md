@@ -38,13 +38,13 @@ There is a dynamic ingestion and schemas, are not tied to any particular data st
 
 ## Technology Stack
 
-Web Application             -           Django
-Database                    -           PostgreSQL
-Database Administration     -           pgAdmin
-Excel Processing            -           pandas, openpyxl
-Background Jobs             -           Celery, Redis
-UI Styling                  -           Tailwind CSS
-Visualization               -           Vue.js, Chart.js or Plotly
+        Web Application             -           Django
+        Database                    -           PostgreSQL
+        Database Administration     -           pgAdmin
+        Excel Processing            -           pandas, openpyxl
+        Background Jobs             -           Celery, Redis
+        UI Styling                  -           Tailwind CSS
+        Visualization               -           Vue.js, Chart.js or Plotly
 
 ### Data Processing Workflow
 
@@ -74,27 +74,27 @@ Visualization               -           Vue.js, Chart.js or Plotly
 
 ### Django Application Structure
 
-project/
-├── config/
-│   ├── settings.py
-│   ├── urls.py
-│   └── celery.py
-├── analysis/
-│   ├── models.py
-│   ├── views.py
-│   ├── forms.py
-│   ├── urls.py
-│   ├── tasks.py
-│   ├── services/
-│   │   ├── workbook_inspector.py
-│   │   ├── column_mapper.py
-│   │   ├── validator.py
-│   │   └── metrics.py
-│   └── templates/
-├── manage.py
-└── requirements.txt
+        project/
+        ├── config/
+        │   ├── settings.py
+        │   ├── urls.py
+        │   └── celery.py
+        ├── analysis/
+        │   ├── models.py
+        │   ├── views.py
+        │   ├── forms.py
+        │   ├── urls.py
+        │   ├── tasks.py
+        │   ├── services/
+        │   │   ├── workbook_inspector.py
+        │   │   ├── column_mapper.py
+        │   │   ├── validator.py
+        │   │   └── metrics.py
+        │   └── templates/
+        ├── manage.py
+        └── requirements.txt
 
-    - Parsing and Analysis logic should be kept in service modules rather than embedding it in views. This makes the pipeline easier to test, reuse and move into Celery tasks.
+Parsing and Analysis logic should be kept in service modules rather than embedding it in views. This makes the pipeline easier to test, reuse and move into Celery tasks.
 
 ### Core Data Concepts
 
@@ -116,15 +116,16 @@ project/
 #### Dashboard
 
 The dashboard makes processing outcomes clear by including:
+
     - Summary cards for processed rows, recognized sheets, missing fields and dataset completeness.
     - Charts are only generated when suitable fields are detected.
     - A sheet and column mapping review screen.
     - A warning and errors view with row or column references.
     - Export options for clean data and summary reports.
 
-#### Core System Design
+## Core System Design
 
-## Dynamic Ingestion Pipeline
+### Dynamic Ingestion Pipeline
 To accomodate inconsistent Excel structures, the system implements a three-tier mapping layer:
 
 - **Automated Sheet Discovery**:
@@ -136,7 +137,7 @@ Utilizes a staging area with PostgreSQL JSONB fields to store raw rows. This all
 - **Graceful Degradation**:
 A validation engine that flags missing optional columns as **null** rather than triggering system failures, ensuring the pipeline completes even with incomplete datasets.
 
-## Analysis and Aggregation Engine
+### Analysis and Aggregation Engine
 Once ingested, the data flows through a transformation pipeline:
 
 - **Cleansing**:
@@ -148,7 +149,7 @@ Computes domain specific KPIs.
 - **Relational Persistence**:
 Aggregated summaries are moved from the JSONB staging area into optimized relational tables for high performance historical querying and trend analysis.
 
-## Visualization Dashboard
+### Visualization Dashboard
 The frontend transforms complex spreadsheet data into an executive summary:
 
 - **KPI Summary Cards**:
