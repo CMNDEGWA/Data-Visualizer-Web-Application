@@ -21,7 +21,7 @@ class ColumnMapper:
         self.upload = upload_instance
 
     def auto_map_columns(self):
-        """Iterates through sheet inspections and creates ColumnMapping records."""
+        """This iterates through sheet inspections and creates ColumnMapping records."""
         sheets = getattr(self.upload, "sheets", None)
         if sheets is None:
             return
