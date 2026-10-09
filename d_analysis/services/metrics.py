@@ -3,7 +3,7 @@
 from d_analysis.models import Upload, MetricSnapshot
 
 class MetricsCalculator:
-    """Computes summary KPIs and dataset metrics for executive dashboards."""
+    """This computes summary KPIs and dataset metrics for executive dashboards."""
 
     def __init__(self, upload_instance: Upload, cleaned_data: dict):
         self.upload = upload_instance
