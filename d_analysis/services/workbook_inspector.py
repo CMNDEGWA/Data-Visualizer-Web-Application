@@ -4,7 +4,7 @@ import pandas as pd
 from d_analysis.models import Upload, SheetInspection, ProcessingLog
 
 class WorkbookInspector:
-    """Dynamically inspects multi-sheet Excel workbooks without hardcoded schemas."""
+    """This dynamically inspects multi-sheet Excel workbooks without hardcoded schemas."""
 
     def __init__(self, upload_instance: Upload):
         self.upload = upload_instance
