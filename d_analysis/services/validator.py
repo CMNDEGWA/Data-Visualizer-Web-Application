@@ -4,7 +4,7 @@ import pandas as pd
 from d_analysis.models import Upload, ProcessingLog
 
 class DataValidator:
-    """Cleans data rows, handles missing optional fields, and logs audit warnings."""
+    """This validates and cleans data rows, handles missing optional fields, and logs audit warnings."""
 
     def __init__(self, upload_instance: Upload):
         self.upload = upload_instance
