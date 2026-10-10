@@ -1,5 +1,7 @@
 # d_analysis/services/column_mapper.py
 
+import re
+
 from d_analysis.models import Upload, ColumnMapping
 
 class ColumnMapper:
@@ -7,7 +9,7 @@ class ColumnMapper:
 
     # Standard header mapping dictionary rules
     STANDARD_DICTIONARY = {
-        'farm id': ['unique internal farm id', 'farm', 'national farm id', 'farm id'],
+        'farm id': ['unique internal farm id', 'national farm id', 'farm id'],
         'village': ['village', 'city', 'village/ city'],
         'district': ['district', 'state', 'province', 'district/ state/province'],
         'farm_area': ['total farm area', 'farm area (ha)', 'certified crop area'],
@@ -49,8 +51,15 @@ class ColumnMapper:
                 )
 
     def _find_match(self, header_str: str) -> str | None:
+        normalized_header = self._normalize_header(header_str)
+        matches = []
         for standard_key, aliases in self.STANDARD_DICTIONARY.items():
             for alias in aliases:
-                if alias in header_str:
-                    return standard_key
-        return None
+                normalized_alias = self._normalize_header(alias)
+                if re.search(rf'\b{re.escape(normalized_alias)}\b', normalized_header):
+                    matches.append((len(normalized_alias), standard_key))
+        return max(matches)[1] if matches else None
+
+    @staticmethod
+    def _normalize_header(header: str) -> str:
+        return re.sub(r'[^a-z0-9]+', ' ', header.casefold()).strip()
