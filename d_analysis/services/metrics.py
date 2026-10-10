@@ -28,21 +28,24 @@ class MetricsCalculator:
             category='Overview'
         )
 
-        # Domain-specific metric extraction (e.g., Farm Area sums if present)
+        numeric_fields = {
+            'farm_area': 'Total Area',
+            'harvest_current': 'Current Harvest',
+            'harvest_previous': 'Previous Harvest',
+        }
         for sheet_name, rows in self.cleaned_data.items():
-            area_sum = 0.0
-            valid_area_count = 0
-            
-            for row in rows:
-                for k, v in row.items():
-                    if 'area' in k.lower() and isinstance(v, (int, float)):
-                        area_sum += float(v)
-                        valid_area_count += 1
-
-            if valid_area_count > 0:
-                MetricSnapshot.objects.create(
-                    upload=self.upload,
-                    metric_name=f'Total Area ({sheet_name})',
-                    metric_value=round(area_sum, 4),
-                    category='Agronomy'
-                )
+            for field_name, metric_label in numeric_fields.items():
+                values = [
+                    row[field_name]
+                    for row in rows
+                    if isinstance(row.get(field_name), (int, float))
+                    and not isinstance(row.get(field_name), bool)
+                ]
+                if values:
+                    MetricSnapshot.objects.create(
+                        upload=self.upload,
+                        metric_name=f'{metric_label} ({sheet_name})',
+                        metric_value=round(sum(values), 4),
+                        category='Agronomy',
+                        calculation_metadata={'field': field_name, 'value_count': len(values)},
+                    )
