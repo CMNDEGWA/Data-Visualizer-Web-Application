@@ -1,7 +1,9 @@
-import os
 from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
 from django.utils import timezone
-from d_analysis.models import Upload, ProcessingJob, MetricSnapshot, ProcessingLog
+from django.db import transaction
+from django.views.decorators.http import require_POST
+from d_analysis.models import Upload, ProcessingJob, ProcessingLog
 from d_analysis.forms import ExcelUploadForm
 from d_analysis.services.workbook_inspector import WorkbookInspector
 from d_analysis.services.column_mapper import ColumnMapper
@@ -21,7 +23,7 @@ def upload_view(request):
                 original_filename=uploaded_file.name,
                 file=uploaded_file,
                 file_size=uploaded_file.size,
-                status='PENDING'
+                status='PROCESSING'
             )
             
             # Create Processing Job tracking record
@@ -32,41 +34,53 @@ def upload_view(request):
             )
 
             try:
-                # 1. Inspect Workbook Structure (Phase 4 service)
-                inspector = WorkbookInspector(upload_instance)
-                inspector.inspect_workbook()
+                with transaction.atomic():
+                    inspector = WorkbookInspector(upload_instance)
+                    inspector.inspect_workbook()
 
-                # 2. Auto-map Columns
-                mapper = ColumnMapper(upload_instance)
-                mapper.auto_map_columns()
+                    mapper = ColumnMapper(upload_instance)
+                    mapper.auto_map_columns()
 
-                # 3. Validate & Clean Data
-                validator = DataValidator(upload_instance)
-                cleaned_data = validator.validate_and_clean_data()
+                    validator = DataValidator(upload_instance)
+                    cleaned_data = validator.validate_and_clean_data()
 
-                # 4. Calculate & Store Metrics
-                calculator = MetricsCalculator(upload_instance, cleaned_data)
-                calculator.compute_and_save_metrics()
+                    calculator = MetricsCalculator(upload_instance, cleaned_data)
+                    calculator.compute_and_save_metrics()
 
-                job.status = 'SUCCESS'
-                job.completed_at = timezone.now()
-                job.save()
+                    upload_instance.status = 'COMPLETED'
+                    upload_instance.save(update_fields=['status'])
+                    job.status = 'SUCCESS'
+                    job.completed_at = timezone.now()
+                    job.save(update_fields=['status', 'completed_at'])
 
                 return redirect('dashboard_view', upload_id=upload_instance.id)
 
             except Exception as e:
+                error_message = str(e)
                 job.status = 'ERROR'
-                job.error_message = str(e)
+                job.error_message = error_message
                 job.completed_at = timezone.now()
                 job.save()
                 upload_instance.status = 'FAILED'
                 upload_instance.save()
-                return render(request, 'd_analysis/upload.html', {'form': form, 'error': str(e)})
+                ProcessingLog.objects.create(
+                    upload=upload_instance,
+                    severity='ERROR',
+                    message=f"Workbook processing failed: {error_message}",
+                )
+                error = error_message
+        else:
+            error = None
     else:
         form = ExcelUploadForm()
+        error = None
 
     recent_uploads = Upload.objects.all().order_by('-uploaded_at')[:5]
-    return render(request, 'd_analysis/upload.html', {'form': form, 'recent_uploads': recent_uploads})
+    return render(request, 'd_analysis/upload.html', {
+        'form': form,
+        'error': error,
+        'recent_uploads': recent_uploads,
+    })
 
 
 def dashboard_view(request, upload_id):
@@ -85,3 +99,19 @@ def dashboard_view(request, upload_id):
         'mappings': mappings,
     }
     return render(request, 'd_analysis/dashboard.html', context)
+
+
+@require_POST
+def delete_upload_view(request, upload_id):
+    upload = get_object_or_404(Upload, id=upload_id)
+    if upload.status not in {'COMPLETED', 'FAILED'}:
+        messages.error(request, 'Only completed or failed workbooks can be deleted.')
+        return redirect('upload_view')
+
+    stored_file = upload.file
+    with transaction.atomic():
+        upload.delete()
+        transaction.on_commit(lambda: stored_file.delete(save=False))
+
+    messages.success(request, 'Workbook and its processing history were deleted.')
+    return redirect('upload_view')
