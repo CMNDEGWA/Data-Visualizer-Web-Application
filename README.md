@@ -1,76 +1,73 @@
 # Data Visualizer
 
-This is a Django application where users can upload, inspect, process and visualizing Excel workbooks with variable sheets and column structures. 
+Data Visualizer is a Django application for uploading and analyzing multi-sheet Excel workbooks. 
 
-There is a dynamic ingestion and schemas, are not tied to any particular data structure format, it can work with different schemas without needing to be redesigned for each one. The design separates file ingestion from analysis and presentation, so new datasets can be supported.
+It discovers worksheets and header rows, automatically maps recognized column names, validates and cleans data, calculates summary metrics, and presents processing results in a dashboard. The current processing pipeline handles **.xlsx** files synchronously and supports a set of fields and metrics.
 
 ## Features
 
-- Upload and inspect multi-sheet **.xlsx** workbooks.
-- Discover worksheets and headers dynamically.
-- Map varying column names to standardized fields.
-- Preserve flexible source data for audit and reprocessing.
-- Clean and validate rows while tolerating missing optional fields.
-- Calculate dataset summaries and configurable KPIs.
-- Display results in a responsive dashboard with charts.
-- Record processing warnings and errors.
-- Export processed summaries and reports.
-- Optionally process large workbooks asynchronously.
+- Upload **.xlsx** workbooks up to 15 MB.
+- Inspect worksheets and detect likely headers within the first 10 rows.
+- Exclude recognized presentation and reference sheets from data processing.
+- Automatically map supported column names to standardized fields and assign unmatched headers custom fields.
+- Trim text values, skip blank rows, and validate recognized numeric farm-area and harvest values.
+- Record upload and processing-job status, processing failures, and validation log entries.
+- Calculate sheet and record totals, plus sums for recognized farm-area and harvest fields.
+- View metrics, worksheet details, column mappings, and recent processing logs on a dashboard.
+- Review recent uploads and delete completed or failed uploads.
 
 ### Architecture
 
         Browser
         │
-        ├── Django views, forms, authentication
+        ├── Django upload form and views
         │
-        ├── Upload and workbook inspection
-        │       └── pandas + openpyxl
+        ├── Synchronous workbook processing
+        │       ├── Inspection: pandas + openpyxl
+        │       ├── Column mapping
+        │       ├── Validation and cleaning
+        │       └── Metric calculation
         │
-        ├── Validation, mapping, and analysis
-        │       ├── PostgreSQL: jobs, mappings, metrics, audit logs
-        │       └── JSONB or staging storage: flexible source rows
-        │
-        ├── Optional background processing
-        │       └── Celery + Redis
+        ├── PostgreSQL
+        │       └── Uploads, jobs, inspections, mappings, metrics, and logs
         │
         └── Django templates + Tailwind CSS
-                └── Chart.js or Plotly
+                └── Upload page and results dashboard
 
 ### Technology Stack
 
         Web Application             -           Django
         Database                    -           PostgreSQL
-        Database Administration     -           pgAdmin
         Excel Processing            -           pandas, openpyxl
-        Background Jobs             -           Celery, Redis
-        UI Styling                  -           Tailwind CSS
-        Visualization               -           Vue.js, Chart.js or Plotly
+        UI Styling                  -           Tailwind CSS (CDN)
+        Optional Administration     -           pgAdmin
+
+Celery and Redis are listed in the project dependencies but are not currently connected to the workbook processing workflow. 
+        
+        Chart.js, Plotly, and Vue.js are not used by the current dashboard.
 
 ## Data Processing Workflow
 
 1. **Upload**:
-    A user uploads an Excel workbook. 
-    The application validates its file type and size, stores it securely and creates a processing job.
+    The upload form accepts **.xlsx** files up to 15 MB. The application stores the workbook and creates upload and processing-job records.
 
 2. **Inspect**:
-    The ingestion service discovers workbook sheets, headers and basic column types rather than relying on fixed sheet positions.
+    The inspector scans workbook sheets, searches the first 10 rows for a likely header row, and records detected headers and row counts. Recognized presentation or reference sheets are excluded from data processing.
 
 3. **Map**:
-    Incoming headers are matched to standardized attributes using configured mappings.
-    Users can review mappings when automatic matching is incertain.
+    The mapper matches supported source headers to standardized fields using built-in aliases. Unmatched headers receive custom field names. Mappings are shown on the dashboard but cannot currently be edited by users.
 
 4. **Validate and Clean**:
-    The processor normalizes values, handles blank rows, trim strings, parse dates and converts numeric fields.
-    Missing optional fields are recorded as null, malformed values are logged.
+    The validator trims text, converts blank values to null, skips and logs blank rows, and converts recognized farm-area and harvest values to numbers. Invalid numeric values generate warnings. Cleaned rows are held in memory during processing and are not persisted as records.
 
 5. **Analyze**:
-    The application computes available KPIs and distribution summaries based on the recognized fields.
+    The application calculates the number of processed data sheets and records, plus sums for recognized farm-area and harvest fields when numeric values are available.
 
 6. **Persist**:
-    It stored job metadata, normalised records or flexible source data, aggregate metrics and warnings.
+    The application stores the uploaded file and processing metadata, sheet inspections, column mappings, metric snapshots, and processing logs in PostgreSQL. Processing runs synchronously as part of the upload request; failures update the job and upload status and create an error log.
 
-7. **Present or Export**:
-    The dashboard displays summaries and charts, with options to download reports and review processing details.
+7. **Present**:
+    The dashboard displays file details, discovered sheets and row counts, computed metrics, column mappings and confidence values, and the latest 20 processing logs. It does not currently provide charts or report exports.
 
 ### Django Application Structure
 
@@ -78,85 +75,52 @@ There is a dynamic ingestion and schemas, are not tied to any particular data st
         ├── config/
         │   ├── settings.py
         │   ├── urls.py
-        │   └── celery.py
-        ├── analysis/
+        │   ├── asgi.py
+        │   └── wsgi.py
+        ├── d_analysis/
         │   ├── models.py
         │   ├── views.py
         │   ├── forms.py
         │   ├── urls.py
-        │   ├── tasks.py
+        │   ├── tests.py
         │   ├── services/
         │   │   ├── workbook_inspector.py
         │   │   ├── column_mapper.py
         │   │   ├── validator.py
         │   │   └── metrics.py
-        │   └── templates/
+        │   └── templates/d_analysis/
+        │       ├── upload.html
+        │       └── dashboard.html
         ├── manage.py
         └── requirements.txt
 
-Parsing and Analysis logic should be kept in service modules rather than embedding it in views. This makes the pipeline easier to test, reuse and move into Celery tasks.
+Workbook inspection, mapping, validation, and metric calculations are separated into service modules and called by the Django views.
 
 ### Core Data Concepts
 
 - **Upload**:
-    original filename, storage path, owner, upload time, checksum and status.
-- **ProcessingJobs**:
-    upload, status, start/end times, processor version and failure details.
+    Original filename, stored file, file size, upload time, checksum field, and upload status.
+- **ProcessingJob**:
+    Upload, processing status, start and completion times, processor version, and failure details.
 - **SheetInspection**:
-    sheet name, detected headers, row count and inspection warnings.
+    Sheet name, detected header row and headers, row count, validity, and inspection warnings.
 - **ColumnMapping**:
-    source header, standardized field, confidence and mappiing version.
-- **ProcessedRecord**:
-    normalized data, if a stable record model is appropriate.
+    Source header, standardized or custom field, confidence score, and mapping version.
 - **MetricSnapshot**:
-    upload or dataset reference, metric name, value and calculation metadata.
+    Upload, metric name and value, category, and calculation metadata.
 - **ProcessingLog**:
-    severity, message, sheet, row and column.
+    Severity, message, and optional sheet, row, and column details.
+
+Cleaned row data is processed in memory and is not stored in a processed-record or staging table.
 
 #### Dashboard
 
-The dashboard makes processing outcomes clear by including:
+The dashboard displays:
 
-    - Summary cards for processed rows, recognized sheets, missing fields and dataset completeness.
-    - Charts are only generated when suitable fields are detected.
-    - A sheet and column mapping review screen.
-    - A warning and errors view with row or column references.
-    - Export options for clean data and summary reports.
+    - Uploaded file size and number of discovered sheets.
+    - Computed metric values, including processed sheet and record totals.
+    - Worksheet names, data/reference classification, header counts, and row counts.
+    - Automatically generated mappings and their confidence scores.
+    - The latest 20 validation and processing log entries.
 
-## Core System Design
-
-### Dynamic Ingestion Pipeline
-To accomodate inconsistent Excel structures, the system implements a three-tier mapping layer:
-
-- **Automated Sheet Discovery**:
-Dynamically inspects workbook metadata to identify relevsnt tabs regardless of their index position.
-
-- **Flexible Column Mapping**:
-Utilizes a staging area with PostgreSQL JSONB fields to store raw rows. This allows the system to capture all incoming data before mapping it to standardized core attributes via user-defined mapping.
-
-- **Graceful Degradation**:
-A validation engine that flags missing optional columns as **null** rather than triggering system failures, ensuring the pipeline completes even with incomplete datasets.
-
-### Analysis and Aggregation Engine
-Once ingested, the data flows through a transformation pipeline:
-
-- **Cleansing**:
-Standardized date formats, trims whitespace and handles missing numeric values.
-
-- **Metric Extraction**:
-Computes domain specific KPIs.
-
-- **Relational Persistence**:
-Aggregated summaries are moved from the JSONB staging area into optimized relational tables for high performance historical querying and trend analysis.
-
-### Visualization Dashboard
-The frontend transforms complex spreadsheet data into an executive summary:
-
-- **KPI Summary Cards**:
-High level metrics showing total records processed and data completeness scores.
-
-- **Adaptive Visualizations**:
-Charts that auto generate based on the detected data types.
-
-- **Audit Logging**:
-A detailed transparency log providing users with warnings regarding malformed data or skipped rows.
+The dashboard does not currently include charts, editable mappings, data-completeness scores, or export options.
