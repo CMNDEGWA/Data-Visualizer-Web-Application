@@ -1,18 +1,19 @@
 # d_analysis/services/workbook_inspector.py
 
 import pandas as pd
-from d_analysis.models import Upload, SheetInspection, ProcessingLog
+from d_analysis.models import Upload, SheetInspection
 
 class WorkbookInspector:
     """This dynamically inspects multi-sheet Excel workbooks without hardcoded schemas."""
+
+    NON_DATA_SHEET_NAMES = {'coverpage', 'guidance', 'dashboard', 'translations'}
 
     def __init__(self, upload_instance: Upload):
         self.upload = upload_instance
         self.file_path = upload_instance.file.path
 
     def inspect_workbook(self):
-        try:
-            xls = pd.ExcelFile(self.file_path)
+        with pd.ExcelFile(self.file_path) as xls:
             sheet_names = xls.sheet_names
 
             inspections = []
@@ -20,24 +21,31 @@ class WorkbookInspector:
                 df = pd.read_excel(xls, sheet_name=sheet_name, header=None)
                 total_rows = len(df)
 
-                # Heuristic: Find the row that likely contains column headers (non-null density)
                 header_row_index = self._detect_header_row(df)
                 warnings: list[str] = []
+                normalized_sheet_name = str(sheet_name).strip().casefold()
+                is_known_non_data_sheet = normalized_sheet_name in self.NON_DATA_SHEET_NAMES
 
                 if header_row_index is not None:
-                    headers = df.iloc[header_row_index].dropna().astype(str).tolist()
+                    headers = [
+                        str(value).strip()
+                        for value in df.iloc[header_row_index].dropna().tolist()
+                        if str(value).strip()
+                    ]
                     data_row_count = total_rows - (header_row_index + 1)
-                    is_valid = True
                 else:
                     headers = []
                     data_row_count = 0
-                    is_valid = False
                     warnings.append("Could not reliably detect column headers; treated as non-data sheet.")
 
-                # Save inspection metadata to PostgreSQL
+                is_valid = header_row_index is not None and not is_known_non_data_sheet
+                if is_known_non_data_sheet:
+                    warnings.append("Recognized as a presentation or reference sheet; not processed as data.")
+
                 inspection = SheetInspection.objects.create(
                     upload=self.upload,
-                    sheet_name=str(sheet_name).strip(),
+                    sheet_name=str(sheet_name),
+                    header_row_index=header_row_index,
                     row_count=max(0, data_row_count),
                     detected_headers=headers,
                     is_valid_data_sheet=is_valid,
@@ -45,19 +53,7 @@ class WorkbookInspector:
                 )
                 inspections.append(inspection)
 
-            self.upload.status = 'INSPECTED'
-            self.upload.save()
             return inspections
-
-        except Exception as e:
-            ProcessingLog.objects.create(
-                upload=self.upload,
-                severity='ERROR',
-                message=f"Workbook inspection failed: {str(e)}"
-            )
-            self.upload.status = 'FAILED'
-            self.upload.save()
-            raise e
 
     def _detect_header_row(self, df: pd.DataFrame, max_rows_to_check: int = 10) -> int | None:
         """Scans top rows to find the most likely header row based on non-empty string counts."""
