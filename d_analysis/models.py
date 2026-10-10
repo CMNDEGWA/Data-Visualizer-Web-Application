@@ -15,8 +15,7 @@ class Upload(models.Model):
     status = models.CharField(
         max_length=50,
         choices=[
-            ('PENDING', 'Pending Inspection'),
-            ('INSPECTED', 'Inspected'),
+            ('PENDING', 'Pending'),
             ('PROCESSING', 'Processing'),
             ('COMPLETED', 'Completed'),
             ('FAILED', 'Failed'),
@@ -52,10 +51,15 @@ class SheetInspection(models.Model):
     """This stores metadata discovered dynamically from individual workbook sheet."""
     upload = models.ForeignKey(Upload, on_delete=models.CASCADE, related_name='sheets')
     sheet_name = models.CharField(max_length=255)
+    header_row_index = models.PositiveIntegerField(blank=True, null=True)
     row_count = models.PositiveIntegerField(default=0)
     detected_headers = models.JSONField(default=list, help_text="List of column headers found in the sheet.")
     is_valid_data_sheet = models.BooleanField(default=True)
     inspection_warnings = models.JSONField(default=list, blank=True)
+
+    @property
+    def display_name(self):
+        return self.sheet_name.strip()
     
     def __str__(self):
         return f"{self.sheet_name} ({self.row_count} rows)"
@@ -68,6 +72,10 @@ class ColumnMapping(models.Model):
     standardized_field = models.CharField(max_length=255)
     confidence_score = models.FloatField(default=1.0)
     mapping_version = models.CharField(max_length=20, default='1.0')
+
+    @property
+    def display_sheet_name(self):
+        return self.sheet_name.strip()
     
     def __str__(self):
         return f"{self.source_header} -> {self.standardized_field}"
